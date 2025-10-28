@@ -1,0 +1,60 @@
+// =========================
+// FILE: AppConfig.java
+// =========================
+package com.example.config;
+
+import org.springframework.context.annotation.*;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
+import org.springframework.orm.hibernate5.LocalSessionFactoryBean;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
+
+import javax.sql.DataSource;
+import java.util.Properties;
+
+import com.example.model.Course;
+import com.example.model.Student;
+import com.example.service.*;
+import com.example.dao.*;
+
+@Configuration
+@ComponentScan(basePackages = "com.example")
+@EnableTransactionManagement
+public class AppConfig {
+
+    @Bean
+    public Course course() {
+        return new Course("Full Stack Development", "6 months");
+    }
+
+    @Bean
+    public Student student(Course course) {
+        return new Student(0, "Demo Student", course.getCourseName());
+    }
+
+    // DataSource Bean
+    @Bean
+    public DataSource dataSource() {
+        DriverManagerDataSource ds = new DriverManagerDataSource();
+        ds.setDriverClassName("com.mysql.cj.jdbc.Driver");
+        ds.setUrl("jdbc:mysql://localhost:3306/springdb");
+        ds.setUsername("root");
+        ds.setPassword("root");
+        return ds;
+    }
+
+    // Hibernate SessionFactory
+    @Bean
+    public LocalSessionFactoryBean sessionFactory() {
+        LocalSessionFactoryBean factoryBean = new LocalSessionFactoryBean();
+        factoryBean.setDataSource(dataSource());
+        factoryBean.setPackagesToScan("com.example.model");
+
+        Properties props = new Properties();
+        props.put("hibernate.dialect", "org.hibernate.dialect.MySQL8Dialect");
+        props.put("hibernate.hbm2ddl.auto", "update");
+        props.put("hibernate.show_sql", "true");
+        factoryBean.setHibernateProperties(props);
+
+        return factoryBean;
+    }
+}
