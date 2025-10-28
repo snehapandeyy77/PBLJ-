@@ -1,0 +1,177 @@
+import java.io.*;
+import java.sql.*;
+import jakarta.servlet.*;
+import jakarta.servlet.http.*;
+
+public class UnifiedServlet extends HttpServlet {
+
+    // Utility method to connect to database
+    private Connection getConnection() throws SQLException {
+        return DriverManager.getConnection("jdbc:mysql://localhost:3306/unifieddb", "root", "password");
+    }
+
+    // Handle both GET and POST requests
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        processRequest(request, response);
+    }
+
+    protected void doPost(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        processRequest(request, response);
+    }
+
+    protected void processRequest(HttpServletRequest request, HttpServletResponse response)
+            throws IOException {
+        response.setContentType("text/html");
+        PrintWriter out = response.getWriter();
+
+        String action = request.getParameter("action");
+        if (action == null) {
+            showHomePage(out);
+        } else {
+            switch (action) {
+                case "login":
+                    handleLogin(request, out);
+                    break;
+                case "viewEmployees":
+                    handleViewEmployees(out);
+                    break;
+                case "searchEmployee":
+                    handleSearchEmployee(request, out);
+                    break;
+                case "attendanceForm":
+                    showAttendanceForm(out);
+                    break;
+                case "submitAttendance":
+                    handleAttendanceSubmission(request, out);
+                    break;
+                default:
+                    out.println("<h3>Invalid action!</h3>");
+            }
+        }
+    }
+
+    // -------------------- UI SECTION --------------------
+
+    private void showHomePage(PrintWriter out) {
+        out.println("<html><head><title>Unified Portal</title></head><body>");
+        out.println("<h2>Welcome to Unified Web Portal</h2>");
+        out.println("<h3>Login</h3>");
+        out.println("<form method='post' action='UnifiedServlet'>");
+        out.println("<input type='hidden' name='action' value='login'>");
+        out.println("Username: <input type='text' name='username'><br>");
+        out.println("Password: <input type='password' name='password'><br>");
+        out.println("<input type='submit' value='Login'>");
+        out.println("</form>");
+        out.println("</body></html>");
+    }
+
+    private void showMenu(PrintWriter out, String username) {
+        out.println("<h2>Welcome, " + username + "!</h2>");
+        out.println("<form method='get' action='UnifiedServlet'>");
+        out.println("<input type='hidden' name='action' value='viewEmployees'>");
+        out.println("<input type='submit' value='View All Employees'>");
+        out.println("</form>");
+
+        out.println("<form method='get' action='UnifiedServlet'>");
+        out.println("<input type='hidden' name='action' value='searchEmployee'>");
+        out.println("Enter Employee ID: <input type='text' name='empId'>");
+        out.println("<input type='submit' value='Search Employee'>");
+        out.println("</form>");
+
+        out.println("<form method='get' action='UnifiedServlet'>");
+        out.println("<input type='hidden' name='action' value='attendanceForm'>");
+        out.println("<input type='submit' value='Go to Attendance Portal'>");
+        out.println("</form>");
+    }
+
+    private void showAttendanceForm(PrintWriter out) {
+        out.println("<h2>Student Attendance Form</h2>");
+        out.println("<form method='post' action='UnifiedServlet'>");
+        out.println("<input type='hidden' name='action' value='submitAttendance'>");
+        out.println("Student ID: <input type='text' name='studentId'><br>");
+        out.println("Date: <input type='date' name='date'><br>");
+        out.println("Status: <select name='status'><option value='Present'>Present</option><option value='Absent'>Absent</option></select><br>");
+        out.println("<input type='submit' value='Submit Attendance'>");
+        out.println("</form>");
+        out.println("<a href='UnifiedServlet'>Back to Home</a>");
+    }
+
+    // -------------------- FUNCTIONAL SECTION --------------------
+
+    private void handleLogin(HttpServletRequest request, PrintWriter out) {
+        String username = request.getParameter("username");
+        String password = request.getParameter("password");
+
+        if ("admin".equals(username) && "1234".equals(password)) {
+            showMenu(out, username);
+        } else {
+            out.println("<h3 style='color:red;'>Invalid credentials. Try again.</h3>");
+            out.println("<a href='UnifiedServlet'>Back to Login</a>");
+        }
+    }
+
+    private void handleViewEmployees(PrintWriter out) {
+        try (Connection con = getConnection();
+             Statement st = con.createStatement();
+             ResultSet rs = st.executeQuery("SELECT * FROM Employee")) {
+
+            out.println("<h2>All Employees</h2>");
+            out.println("<table border='1'><tr><th>ID</th><th>Name</th><th>Salary</th></tr>");
+            while (rs.next()) {
+                out.println("<tr><td>" + rs.getInt("EmpID") + "</td><td>" +
+                        rs.getString("Name") + "</td><td>" +
+                        rs.getDouble("Salary") + "</td></tr>");
+            }
+            out.println("</table>");
+            out.println("<a href='UnifiedServlet'>Back</a>");
+        } catch (Exception e) {
+            out.println("<h3>Error: " + e.getMessage() + "</h3>");
+        }
+    }
+
+    private void handleSearchEmployee(HttpServletRequest request, PrintWriter out) {
+        String empId = request.getParameter("empId");
+        try (Connection con = getConnection();
+             PreparedStatement ps = con.prepareStatement("SELECT * FROM Employee WHERE EmpID=?")) {
+            ps.setString(1, empId);
+            ResultSet rs = ps.executeQuery();
+
+            out.println("<h2>Search Result</h2>");
+            out.println("<table border='1'><tr><th>ID</th><th>Name</th><th>Salary</th></tr>");
+            while (rs.next()) {
+                out.println("<tr><td>" + rs.getInt("EmpID") + "</td><td>" +
+                        rs.getString("Name") + "</td><td>" +
+                        rs.getDouble("Salary") + "</td></tr>");
+            }
+            out.println("</table>");
+            out.println("<a href='UnifiedServlet'>Back</a>");
+        } catch (Exception e) {
+            out.println("<h3>Error: " + e.getMessage() + "</h3>");
+        }
+    }
+
+    private void handleAttendanceSubmission(HttpServletRequest request, PrintWriter out) {
+        String studentId = request.getParameter("studentId");
+        String date = request.getParameter("date");
+        String status = request.getParameter("status");
+
+        try (Connection con = getConnection();
+             PreparedStatement ps = con.prepareStatement("INSERT INTO Attendance VALUES (?, ?, ?)")) {
+            ps.setString(1, studentId);
+            ps.setString(2, date);
+            ps.setString(3, status);
+            int i = ps.executeUpdate();
+
+            if (i > 0) {
+                out.println("<h3>Attendance recorded successfully!</h3>");
+            } else {
+                out.println("<h3>Failed to record attendance.</h3>");
+            }
+            out.println("<a href='UnifiedServlet'>Back</a>");
+        } catch (Exception e) {
+            out.println("<h3>Error: " + e.getMessage() + "</h3>");
+        }
+    }
+}
